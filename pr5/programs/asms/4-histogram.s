@@ -39,12 +39,23 @@ n:
 .section .text
 .globl main
 main:
-	# your code here
-	# you may change the numbers in the marks array. 
-	# Change the size of the array n suitably; 
-	# The histogram should be in count.
-	# the name of the arrays to remain unchanged
-	# remove these comments!
+	la x10,marks
+        la x11,count
+        la x12,n
+        lw x1,0(x12)
+
+loop:
+        beq x1,x0, halt
+        lw x2,0(x10)
+        slli x3,x2,2
+        add x4,x11,x3
+        lw x5,0(x4)
+        addi x5,x5,1
+        sw x5,0(x4)
+
+        addi x10,x10,4
+        addi x1,x1,-1
+        j loop
 
 
 halt:
