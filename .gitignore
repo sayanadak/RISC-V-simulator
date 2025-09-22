@@ -4,3 +4,5 @@
 **/dumps/**
 **/runs/**
 **/dists/**
+**/__pycache__/**
+*.pyc
