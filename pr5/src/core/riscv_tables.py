@@ -35,6 +35,14 @@ def is_store(instr :int):
         return True
     else:
         return False
+    
+def e_jal(op1,op2):
+   
+    return op1 + 4
+
+def e_jalr(op1, op2):
+    
+    return op1 + 4   
 
 alu_function = {
     0x33000: e_add,     # "add"
@@ -79,8 +87,8 @@ alu_function = {
     0x63500: e_bge,     # "bge"
     0x63600: e_blt,     # "bltu"
     0x63700: e_bge,     # "bgeu"
-    0x6F000: None,      # "jal"    # TODO: Fix this entry (without changing fu.py)
-    0x67000: None,      # "jalr"   # TODO: Fix this entry (without changing fu.py)
+    0x6F000: e_jal,     # "jal"    # TODO: Fix this entry (without changing fu.py)
+    0x67000: e_jalr,    # "jalr"   # TODO: Fix this entry (without changing fu.py)
     0x17000: e_auipc,   # "auipc"
     0x73000: e_nop,     # "ecall"
     0x73001: e_nop      # "ebreak"
@@ -97,7 +105,7 @@ alu_operands = {
     0x33520: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, v_rs2),               # "sra"
     0x33200: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, v_rs2),               # "slt"
     0x33300: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, to_unsigned(v_rs2)),  # "sltu"
-    0x13000: lambda v_rs1, v_rs2, v_imm, v_pc: (None, None),                  # "addi"  # TODO: Fix this entry (without changing fu.py)
+    0x13000: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, v_imm),                  # "addi"  # TODO: Fix this entry (without changing fu.py)
     0x13400: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, v_imm),               # "xori"
     0x13600: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, v_imm),               # "ori"
     0x13700: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, v_imm),               # "andi"
@@ -114,7 +122,7 @@ alu_operands = {
     0x33501: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, to_unsigned(v_rs2)),  # "divu"
     0x33601: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, v_rs2),               # "rem"
     0x33701: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, to_unsigned(v_rs2)),  # "remu"
-    0x37000: lambda v_rs1, v_rs2, v_imm, v_pc: (None, None),                 # "lui"     # TODO: Fix this entry (without changing fu.py)
+    0x37000: lambda v_rs1, v_rs2, v_imm, v_pc: (v_imm, 12),                 # "lui"     # TODO: Fix this entry (without changing fu.py)
     0x03000: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, v_imm),               # "lb"
     0x03100: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, v_imm),               # "lh"
     0x03200: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, v_imm),               # "lw"
@@ -129,9 +137,10 @@ alu_operands = {
     0x63500: lambda v_rs1, v_rs2, v_imm, v_pc: (v_rs1, v_rs2),               # "bge"
     0x63600: lambda v_rs1, v_rs2, v_imm, v_pc: (to_unsigned(v_rs1), to_unsigned(v_rs2)),  # "bltu"
     0x63700: lambda v_rs1, v_rs2, v_imm, v_pc: (to_unsigned(v_rs1), to_unsigned(v_rs2)),  # "bgeu"
-    0x6F000: lambda v_rs1, v_rs2, v_imm, v_pc: (None, None),                    # "jal"     # TODO: Fix this entry (without changing fu.py)
-    0x67000: lambda v_rs1, v_rs2, v_imm, v_pc: (None, None),                    # "jalr"    # TODO: Fix this entry (without changing fu.py)
+    0x6F000: lambda v_rs1, v_rs2, v_imm, v_pc: (v_pc, v_imm),                    # "jal"     # TODO: Fix this entry (without changing fu.py)
+    0x67000: lambda v_rs1, v_rs2, v_imm, v_pc: (v_pc, v_imm),                    # "jalr"    # TODO: Fix this entry (without changing fu.py)
     0x17000: lambda v_rs1, v_rs2, v_imm, v_pc: (v_pc,  v_imm),               # "auipc"
     0x73000: lambda v_rs1, v_rs2, v_imm, v_pc: (None, None),                 # "ecall"      # NOTE: Unimplemented
     0x73001: lambda v_rs1, v_rs2, v_imm, v_pc: (None, None),                 # "ebreak"     # NOTE: Unimplemented
 }
+

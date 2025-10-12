@@ -152,9 +152,9 @@ class Processor(ABC):
             self.decoded["funct3"] = 0x0
             self.decoded["funct7"] = 0x00
 
-        self.logr.debug(f"opcode = {self.decoded["opcode"]:02x}, " + 
-                        f"funct3 = {self.decoded["funct3"]:01x}, " + 
-                        f"funct7 = {self.decoded["funct7"]:02x}")
+        self.logr.debug(f"opcode = {self.decoded['opcode']:02x}, " + 
+                        f"funct3 = {self.decoded['funct3']:01x}, " + 
+                        f"funct7 = {self.decoded['funct7']:02x}")
         self.op = ((self.decoded["opcode"] << 12) | 
                    (self.decoded["funct3"] << 8) | 
                    (self.decoded["funct7"]))
@@ -179,7 +179,6 @@ class Processor(ABC):
             self.op2 = self.op2 - (1 << 32)
         self.logr.debug(f"op1: {self.op1}, op2: {self.op2}")
 
-
     def execute(self):
         """
         Execute the instruction
@@ -187,17 +186,41 @@ class Processor(ABC):
         returns the result of the operation
         """
         # TODO: alu_function is incomplete. Complete it (without modifying fu.py)
-        self.result = alu_function.get(self.op, None)(self.op1, self.op2)
-        self.logr.debug(f"Result of {self.op:05x} is: {self.result}")
+        func = alu_function.get(self.op, None)
 
+        
+        if func is None:
+           self.result = 0
+        else:
+            self.result = func(self.op1, self.op2)
+
+        if (self.op & 0XFF000) >> 12 in (0X6F, 0X67):
+            self.result = self.curr_pc + 4
+        
+
+        self.logr.debug(f"Result of {self.op:05x} is: {self.result}")  
+
+   
     def update_pc(self):
         """
         Update PC to take a branch or jump
         """
         # TODO: Complete this function appropriately
+        inst = self.op
+        imm = self.decoded["imm"]
+        rs1_val = self.registers[self.decoded["rs1"]] if self.decoded["rs1"] != 0 else 0
        
-        # Straight-line code is default case
-        self.pc = self.curr_pc + 4
+        if is_branch(inst):
+            if self.result:
+                self.pc =self.curr_pc + imm
+            else:
+                self.pc =self.curr_pc + 4
+        elif((inst &    0XFF000) >> 12) == 0X6F:
+            self.pc = self.curr_pc +imm
+        elif ((inst & 0XFF000) >> 12) == 0X67:
+            self.pc = (rs1_val +imm ) & ~1
+        else:
+            self.pc = self.curr_pc + 4
 
     def mem_access(self):
         """
@@ -293,3 +316,4 @@ class Processor(ABC):
     def run(self, num_insts):
         """Run the processor. To be implemented by subclasses."""
         pass
+
