@@ -29,9 +29,8 @@ class Processor(ABC):
 
     def decode(self, instruction: int):
         """
-        Gets an instruction (32-bit integer) and sets the "decoded" dictionary.
-        fields in decoded are {"opcode", "rs1", "rs2", "rd", "imm"}
-        Ensure that "imm" has a signed value where appropriate
+        Gets an instruction (32-bit integer) and returns
+        a dictionary with the following fields {"opcode", "rs1", "rs2", "rd", "imm"}
         """
         # Extract the opcode (7 bits)
         opcode = instruction & 0x7F
@@ -186,7 +185,6 @@ class Processor(ABC):
         decoded_instr, operand1 and operand2 are returned by previous stages
         returns the result of the operation
         """
-        # TODO: alu_function is incomplete. Complete it (without modifying fu.py)
         self.result = alu_function.get(self.op, None)(self.op1, self.op2)
         self.logr.debug(f"Result of {self.op:05x} is: {self.result}")
 
@@ -194,8 +192,21 @@ class Processor(ABC):
         """
         Update PC to take a branch or jump
         """
-        # TODO: Complete this function appropriately
-       
+        inst = self.op
+        if is_branch(inst):
+            if self.result:
+                self.pc = self.curr_pc + self.decoded["imm"]
+                return
+
+        if is_jump(inst):
+            if inst == 0x6F000:   # jal instr
+                self.pc = self.curr_pc + self.decoded["imm"]
+            elif inst == 0x67000: # jalr instr
+                rs1 = self.decoded["rs1"]
+                v_rs1 = self.registers[rs1] if rs1 != 0 and rs1 != None else 0
+                self.pc = v_rs1 + self.decoded["imm"]
+            return
+        
         # Straight-line code is default case
         self.pc = self.curr_pc + 4
 
@@ -239,7 +250,6 @@ class Processor(ABC):
         """
         Write the result of the operation back to the register.
         """
-        # NOTE: CAUTION - Changing the outputs here will violate test cases
         inst = self.op
         rd = self.decoded["rd"]
         
