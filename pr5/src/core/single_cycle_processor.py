@@ -1,8 +1,9 @@
 from .processor import Processor
 
 class SingleCycleProcessor(Processor):
-    def __init__(self, start, ram, logger):
+    def __init__(self, start, ram, logger, st):
         super().__init__(start, ram, logger)
+        self.stats = st
 
     def run(self, num_insts):
         """
@@ -20,5 +21,7 @@ class SingleCycleProcessor(Processor):
             self.update_pc()
             self.reg_write()
             i_cnt += 1
-
+            self.stats.increment_instruction_count()
+        
         self.logr.info(f"Simulated {i_cnt} instructions")
+
