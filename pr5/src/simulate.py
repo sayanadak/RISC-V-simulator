@@ -16,6 +16,8 @@ def parse_args():
                         help='Path to the input r5ob file')
     parser.add_argument('--num_insts', type=int, default=1000,
                         help='Number of instructions to simulate (default: 1000)')
+    # TODO: Parse another argument '--proc', of string type, which selects the
+    # appropriate processor to instantiate.
     return parser.parse_args()
 
 def run_simulation():
@@ -34,8 +36,10 @@ def run_simulation():
     loader.load(mem, args.r5ob_path)
     # mem.dump(0x80002000, 0x80002020)
     st = stats.Statistics(loggr)
-    # processor = core.SingleCycleProcessor(args.start, mem, loggr, st)
+    # TODO: Instantiate the appropriate processor (SingleCycleProcessor or
+    # PipelinedProcessor) depending on the command line argument.
     processor = core.PipelinedProcessor(args.start, mem, loggr, st)
+    # processor = core.SingleCycleProcessor(args.start, mem, loggr, st)
 
     loggr.info(f"Start address: {hex(args.start)}")
     loggr.info(f"Executable path: {args.r5ob_path}")
