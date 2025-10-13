@@ -6,3 +6,6 @@
 **/dists/**
 **/__pycache__/**
 *.pyc
+*.log
+*.trace
+*.json
