@@ -7,43 +7,32 @@ a:
 
 .globl main
 main:
-	la t1, a
-        lw t0, 0(t1)     
 
-    
-        li  t2, 1
-        ble t0, t2, not_prime
+	la t0, a 
+	lw a0, 0(t0) 				#N
+	#blt t1, 2, halt 			#directly terminating program as can't be prime anymore only regsiseter comparision
+	addi x1, x0 , 2
+	beq a0, x1, prime
 
-    
-        li  t2, 2
-        beq t0, t2, is_prime
+	addi t0, x0, 2 				#starting loop from 2 (i)
+	addi t1, a0, -1 			#for loop end check 
+	blt a0,x1, not_prime
 
-    
-        andi t3, t0, 1
-        beqz t3, not_prime
 
-   
-        li t1, 3
-
-check_loop:
-    
-        mul t2, t1, t1
-        bgt t2, t0, is_prime
-
-    
-        rem  t3, t0, t1
-        beqz t3, not_prime   
-
-    
-        addi t1, t1, 2
-        j check_loop
-
-is_prime:
-        li a0, 1          
-        j halt
-
-not_prime:
-        li a0, -1 
+	loop: 
+		beq t0, t1, prime  		#loop over prime confirmed
+		rem t3, a0, t0 		 	#check remainder of N%i
+		beq t3, x0, not_prime   #remainder zero jump to not_prime
+		addi t0, t0, 1 			#increment i by 1
+		#jal x0, loop			#continue loop
+		j loop					#same as above
+	
+	prime: 
+		addi x10, x0 , 1
+		j halt
+	not_prime: 
+		addi x10, x0, -1
+		j halt
 
 halt:
 	j halt

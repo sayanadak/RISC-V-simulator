@@ -12,8 +12,3 @@ main:
 	# let your code flow in here to end execution
 halt:
 	j halt
-
-
-
-
-

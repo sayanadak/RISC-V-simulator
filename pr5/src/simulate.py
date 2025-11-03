@@ -18,6 +18,7 @@ def parse_args():
                         help='Number of instructions to simulate (default: 1000)')
     # TODO: Parse another argument '--proc', of string type, which selects the
     # appropriate processor to instantiate.
+    parser.add_argument('--proc', type=str,default='SingleCycleProcessor', help="choose between 'SingleCycleProcessor' or 'PipelinedProcessor' processor" )
     return parser.parse_args()
 
 def run_simulation():
@@ -38,9 +39,13 @@ def run_simulation():
     st = stats.Statistics(loggr)
     # TODO: Instantiate the appropriate processor (SingleCycleProcessor or
     # PipelinedProcessor) depending on the command line argument.
-    processor = core.PipelinedProcessor(args.start, mem, loggr, st)
+    if(args.proc=='PipelinedProcessor'):
+        processor = core.PipelinedProcessor(args.start, mem, loggr, st)
+    elif (args.proc == 'SingleCycleProcessor'): 
+        processor = core.SingleCycleProcessor(args.start, mem, loggr, st)
+    
     # processor = core.SingleCycleProcessor(args.start, mem, loggr, st)
-
+    processor = core.PipelinedProcessor(args.start, mem, loggr, st)
     loggr.info(f"Start address: {hex(args.start)}")
     loggr.info(f"Executable path: {args.r5ob_path}")
     loggr.info(f"Number of instructions: {args.num_insts}")

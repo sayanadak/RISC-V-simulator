@@ -1,59 +1,56 @@
-.section .data
-	.align 2
+    .section .data
+    .align 2
 a:
-	.word 70
-	.word 80
-	.word 40
-	.word 20
-	.word 10
-	.word 30
-	.word 50
-	.word 60
+    .word 70
+    .word 80
+    .word 40
+    .word 20
+    .word 10
+    .word 30
+    .word 50
+    .word 60
 n:
-	.word 8
+    .word 8          # size of array
 
-.section .text
-.globl main
+    .section .text
+    .globl main
 main:
-	la t0, a              
-	lw t1, n              
-	addi t1, t1, -1       
-	li t2, 0              
+    # Load base address of array and size
+    la t0, a          # t0 = base address of array
+    la t1, n          # base address for N
+    lw t1, 0(t1)	  # N
 
-outer_loop:
-	bge t2, t1, end       
 
-	li  t3, 0              
-inner_loop:
-	sub t4, t1, t2        
-	bge t3, t4, next_outer 
+    li t2, 0          # i = 0 (outer loop index)
+	outer_loop:
+		bge t2, t1, halt  # if i >= n, sorting done
+		add t3, t2, 1     # j = i + 1 (inner loop index)
+		inner_loop:
+			bge t3, t1, outer_increment  # if j >= n, move to next i
 
-	slli t5, t3, 2        
-	add  t6, t0, t5        
-	lw   t4, 0(t6)    
-     
-	addi t5, t3, 1        
-	slli t5, t5, 2        
-	add  t5, t0, t5       
-	lw   t6, 0(t5)          
+			# Compute addresses of a[i] and a[j]
+			slli t4, t2, 2    # t4 = i*4(offset compute i)
+			slli t5, t3, 2    # t5 = j*4(offset compute for j)
+			add t6, t0, t4    # t6 = &a[i]
+			add a0, t0, t5    # a0 = &a[j]
 
-	blt t4, t6, swap      
+			lw a1, 0(t6)      # a1 = a[i]
+			lw a2, 0(a0)      # a2 = a[j]
 
-	j skip_swap
+			blt a1, a2, do_swap   # if a[i] < a[j], swap
+			j inner_next
 
-swap:
-	sw t6, 0(t0)          
-	sw t4, 0(t5)          
+		do_swap:
+			sw a2, 0(t6)      # a[i] = a[j]
+			sw a1, 0(a0)      # a[j] = a[i]
 
-skip_swap:
-	addi t3, t3, 1        
-	j inner_loop
+		inner_next:
+			addi t3, t3, 1
+			j inner_loop
 
-next_outer:
-	addi t2, t2, 1        
-	j outer_loop
+	outer_increment:
+		addi t2, t2, 1
+		j outer_loop
 
-end:
-	li a7, 93
 halt:
-	j halt
+    j halt            

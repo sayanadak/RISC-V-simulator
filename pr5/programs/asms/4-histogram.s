@@ -39,23 +39,37 @@ n:
 .section .text
 .globl main
 main:
-	la x10,marks
-        la x11,count
-        la x12,n
-        lw x1,0(x12)
+	# Check list
+	# index i to traverse through array and get it's value a[i]
+	# get value at index i and store it in count[a[i]]
 
-loop:
-        beq x1,x0, halt
-        lw x2,0(x10)
-        slli x3,x2,2
-        add x4,x11,x3
-        lw x5,0(x4)
-        addi x5,x5,1
-        sw x5,0(x4)
+	la t0, n 
+	lw t0,0(t0) 			#N 
+	addi t1, x0 , 0 			#i
+	la a0, marks			#base address of marks
+	la a1, count	        #base address of count
+	
+	loop: 
+		beq t1, t0, halt   #break condition
 
-        addi x10,x10,4
-        addi x1,x1,-1
-        j loop
+		slli t2, t1, 2 		#t2 = i*4
+		add t3, t2, a0 		#t3 address of marks[i]
+		lw t4, 0(t3) 		#t4 = marks[i]
+
+		slli t5, t4, 2 		#t5 = marks[i]*4
+		add t5, t5, a1 		#t5 address of count[marks[i]]
+		lw t6, 0(t5) 		#t6 = count[marks[i]]
+		addi t6, t6, 1 		#t6 = count[marks[i]] + 1
+		sw t6, 0(t5) 		#count[marks[i]] = t6
+		
+		#loop continues
+		addi t1, t1, 1
+		j loop
+
+
+
+
+	
 
 
 halt:

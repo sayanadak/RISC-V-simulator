@@ -12,34 +12,33 @@ l:
 .section .text
 .globl main
 main:
-	
-        la t0, l             
-        lw t1, n             
-        li t2, 0             
-        li t3, 0             
+	#first create count to track array number of iterations
+		la t0, l          # t0 = base address
+		#lw a0, 0(n)       # a0 = size of array(willl work as count) .....wrong method
+		la t2, n   #load address
+		lw a0, 0(t2)
+		addi x10, x0, 0   # result counter = 0
 
-loop:
-    beq  t2, t1, end      
+	loop:
+		beq a0, x0, halt  # break condition (a0 == x0)
 
-    slli t4, t2, 2       
-    add  t5, t0, t4       
-    lw   t6, 0(t5)         
+		lw t1, 0(t0)      # load element into t1
 
-    blt  t6, x0, skip     
+		# check positive
+		blt t1, x0, skip  # if <0, skip
 
-    andi t4, t6, 1       
-    bne  t4, x0, skip     
+		# check even
+		andi t2, t1, 1
+		bne  t2, x0, skip # if odd, skip
 
-    addi t3, t3, 1      
+		addi x10, x10, 1  # if both true, increment counter
 
-skip:
-    addi t2, t2, 1       
-    j loop
-
-end:
-    mv x10, t3         
-
-    li a7, 93
+	skip:
+		addi t0, t0, 4    # next element
+		addi a0, a0, -1   # decrement loop counter
+		jal x0, loop
 
 halt:
-	j halt
+    j halt
+
+
