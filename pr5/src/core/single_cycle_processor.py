@@ -1,5 +1,5 @@
 from .processor import Processor
-from .riscv_tables import * # Need this for is_unimplemented
+from .riscv_tables import *
 
 class SingleCycleProcessor(Processor):
     def __init__(self, start, ram, logger, st):
@@ -11,38 +11,40 @@ class SingleCycleProcessor(Processor):
         Run the processor in a single cycle for each instruction.
         """
         i_cnt = 0
-        # registers = [0]*32  # This is already a member of the base Processor class
-        self.stats.reset()
-        while (i_cnt < num_insts):
-            
-            # 1. 'fetch' is stateless, so we must pass the processor's current PC
-            instruction, curr_pc = self.fetch(self.pc)
-            
-            if instruction is None:
-                break 
-            decoded, op = self.decode(instruction)
-
-            # 2. 'operand_fetch' returns 3 values (op1, op2, op)
-            # 3. Pass the 'curr_pc' from fetch, not the stale 'self.curr_pc'
-            op1, op2, op = self.operand_fetch(decoded, self.registers, curr_pc, op)
-            
-            result = self.execute(op1, op2, op)
-
-            rs2 = decoded["rs2"]
-            store_data = self.registers[rs2] if rs2 != 0 and rs2 != None else 0
-
-            ldata = self.mem_access(op, result, decoded,store_data)
-
-            new_pc = self.update_pc(op, result, curr_pc, decoded)
-            
-            # Pass the processor's register file 'self.registers'
-            self.reg_write(op, decoded, curr_pc, new_pc, result, ldata, self.registers)
-            
-            # 4. CRITICAL: Update the processor's state (self.pc) for the next loop
-            self.pc = new_pc
-            
-            i_cnt += 1
-            self.stats.increment_clock_cycle()
-            self.stats.increment_instruction_count()
+        pc = self.pc
+        self.logr.info("Started single cycle processor")
         
-        self.logr.info(f"Simulated {i_cnt} instructions")
+        while i_cnt < num_insts:
+            self.logr.info(f"[DEBUG] Fetching instruction at PC = {hex(pc)}")
+
+            instruction, next_pc = self.fetch(pc, self.mem)
+            if instruction is None:
+                self.logr.info(f"[DEBUG] No instruction found at {hex(pc)} - stopping simulation.")
+                break
+
+            op, decoded = self.decode(instruction)
+            if decoded is None:
+                self.logr.info(f"[DEBUG] Decode failed for instruction {hex(instruction)} - stopping.")
+                break
+            self.logr.info(f"[DEBUG] Decoded = {decoded}")
+
+            op1, op2 = self.operand_fetch(decoded, self.registers, pc)
+            op = decoded.get("op", None)
+            
+            result = self.execute(op, op1, op2)
+            self.logr.debug(f"Execute result: op1={op1:08x}, op2={op2 if isinstance(op2, int) else 0:08x}, result={result:08x}")
+            
+            ldata = self.mem_access(op, result, self.mem, self.registers, decoded)
+            
+            new_pc = self.update_pc(pc, op, result, decoded, self.registers)
+
+            self.registers = self.reg_write(op, decoded, result, ldata,
+                                            self.registers, pc, new_pc,
+                                            self.mem, self.logr)
+
+            self.stats.increment_instruction_count()
+            i_cnt += 1
+            pc = new_pc
+
+        self.pc = pc
+        self.logr.info(f"Simulation complete: executed {i_cnt} instructions.")

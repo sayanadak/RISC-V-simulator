@@ -1,129 +1,199 @@
 from .processor import Processor
 
-
 class PipelinedProcessor(Processor):
     def __init__(self, start, ram, logger, st):
         super().__init__(start, ram, logger)
         self.stats = st
 
-        # NOTE: The following dictionary is only suggestive. You may wish to
-        # use a different structure or names if deemed fit
         self.pipeline_regs = {
             "IF/ID": None,
             "ID/EX": None,
             "EX/MEM": None,
             "MEM/WB": None,
         }
+        
+        self.flush_count = 0
+        self.branch_taken = False
+        self.new_pc = None
 
     def run(self, num_insts):
         """
         Run a 5-stage pipelined processor.
+        Implements basic 5-stage pipeline: IF -> ID -> EX -> MEM -> WB
+        Handles control hazards with 3-cycle penalty (target PC after EX stage)
+        Handles data hazards with stalls (no forwarding)
         """
-        # TODO: Complete this function in such a way that the statistics file
-        # (stats.json) has the correct cycle count when the program is executed
-        # on a simple 5-stage pipeline without any forwarding or bypass
-        # mechanism implemented. Assume that the targetPC is generated after
-        # the EX stage (there will be three wrong-path instructions in case of
-        # a control hazard). You should change the interfaces of fetch(),
-        # decode(), operand_fetch(), execute(), update_pc(), mem_access(), and
-        # reg_write() functions of the Processor base class as needed, and
-        # update the code of the SingleCycleProcessor appropriately. Refrain
-        # from changing the output formats of the [OUT] messages printed from
-        # the reg_write() function. You can ignore counting the number of
-        # memory accesses for now.
-
-        '''
-            fetch -> decode -> execute -> memory_access -> write_back 
-            but this flow can't be done in simulator because each state will 
-            use it's previous registers latch to get registers,oprand, oprator etc.
-            go with normal flow then fetch will update the IF/ID regsiters. and decode
-            will be using this IF/ID registers to execute instruction but which is wrong. 
-            hence we can change flow to avoid this or we can create another copy of this 
-            registers which will store the previous register values. 
-
-            I am trying to copy all the registers in dummy variable at the start of the clock 
-            then this dummy variables will be used for each stage and original pipeline_regs will be updated
-            after each stage run
-
-            Data hazards are simply countered by adding bubble. 
-            1.controle hazard->add two bubbles
-            2.data hazard(RAW dependency) -> add two bubbles
-            3.structural hazards
-        '''
-        self.stats.reset(); 
-        total_cycles = num_insts + 4 # four instruction to drain the pipeline
-
-        for cycle in range(total_cycles):
-            dummy_regs = self.pipeline_regs.copy() # normal dummy=self.pipeline_regs will make changes to pipeline_regs, hence deep copy
-
-            #INSTRUCTION FETCH => should store the insruction and current_pc to IF/ID_regs
-            if(cycle<num_insts):
-                instruction,curr_pc = self.fetch(self.pc)
-                self.pc = curr_pc + 4; #update pc logic for later 
-                self.pipeline_regs["IF/ID"] = {
-                    "instruction":instruction, 
-                    "curr_pc" : curr_pc
-                }
+        cycle = 0
+        instructions_completed = 0
+        
+        while instructions_completed < num_insts:
+            cycle += 1
+                        
+            wb_done = self.writeback_stage()
+            if wb_done:
+                instructions_completed += 1
+            
+            self.memory_stage()
+            self.execute_stage()
+            stall = self.decode_stage()
+            
+            if not stall:
+                self.fetch_stage()
             else:
-                self.pipeline_regs["IF/ID"] = None #bubble
+                pass
+        
+        self.stats['cycles'] = cycle
+        self.logger.log(f"[PIPELINE] Completed {num_insts} instructions in {cycle} cycles")
 
+    def fetch_stage(self):
+        """
+        Instruction Fetch (IF) stage
+        Fetches instruction from memory at PC and stores in IF/ID register
+        """
+        if self.flush_count > 0:
+            self.pipeline_regs["IF/ID"] = {"bubble": True}
+            self.flush_count -= 1
+            return
+        
+        if self.branch_taken:
+            self.pc = self.new_pc
+            self.branch_taken = False
+        
+        try:
+            inst = self.fetch(self.pc)
+            self.pipeline_regs["IF/ID"] = {
+                "pc": self.pc,
+                "inst": inst,
+                "bubble": False
+            }
+            self.pc += 4 
+        except:
+            self.pipeline_regs["IF/ID"] = {"bubble": True}
 
+    def decode_stage(self):
+        """
+        Instruction Decode (ID) stage
+        Decodes instruction and reads registers
+        Returns True if pipeline should stall due to data hazard
+        """
+        if_id = self.pipeline_regs["IF/ID"]
+        
+        if if_id is None or if_id.get("bubble"):
+            self.pipeline_regs["ID/EX"] = {"bubble": True}
+            return False
+        
+        inst = if_id["inst"]
+        pc = if_id["pc"]
+        
+        decoded = self.decode(inst)
+        
+        stall = self.check_data_hazard(decoded)
+        
+        if stall:
+            self.pipeline_regs["ID/EX"] = {"bubble": True}
+            return True
+        
+        operands = self.operand_fetch(decoded)
+        
+        self.pipeline_regs["ID/EX"] = {
+            "pc": pc,
+            "decoded": decoded,
+            "operands": operands,
+            "bubble": False
+        }
+        
+        return False
 
+    def check_data_hazard(self, decoded):
+        """
+        Check if there's a load-use data hazard that requires a stall
+        Returns True if stall is needed
+        """
+        id_ex = self.pipeline_regs["ID/EX"]
+        
+        if id_ex is None or id_ex.get("bubble"):
+            return False
+        
+        prev_decoded = id_ex.get("decoded")
+        if prev_decoded and prev_decoded.get("opcode") in ["lw", "lb", "lh", "lbu", "lhu"]:
+            prev_rd = prev_decoded.get("rd")
+            
+            curr_rs1 = decoded.get("rs1")
+            curr_rs2 = decoded.get("rs2")
+            
+            if prev_rd and (prev_rd == curr_rs1 or prev_rd == curr_rs2):
+                return True
+        
+        return False
 
-            #INSTRUCTION DECODE AND OPRAND FETCH => should store the curr_pc, decoded, op, op1, op2,rs2 to ID/EX STAGE
-            id_data = dummy_regs["IF/ID"] 
-            if id_data is not None: 
-                decoded, op = self.decode(id_data["instruction"])
-                op1,op2,_ = self.operand_fetch(decoded,self.registers,id_data["curr_pc"], op)
-                self.pipeline_regs["ID/EX"] ={
-                    "curr_pc": id_data["curr_pc"], 
-                    "decoded": decoded,     
-                    "op" : op, 
-                    "op1" : op1, 
-                    "op2" : op2, 
-                    "store_data" : self.registers[decoded["rs2"]]
-                }
-            else:
-                self.pipeline_regs["ID/EX"] = None
+    def execute_stage(self):
+        """
+        Execute (EX) stage
+        Performs ALU operations and determines branch target
+        """
+        id_ex = self.pipeline_regs["ID/EX"]
+        
+        if id_ex is None or id_ex.get("bubble"):
+            self.pipeline_regs["EX/MEM"] = {"bubble": True}
+            return
+        
+        decoded = id_ex["decoded"]
+        operands = id_ex["operands"]
+        pc = id_ex["pc"]
+        
+        result = self.execute(decoded, operands, pc)
+        
+        if decoded.get("control_flow"):
+            target_pc = result.get("target_pc")
+            if target_pc is not None and target_pc != pc + 4:
+                self.flush_count = 3
+                self.branch_taken = True
+                self.new_pc = target_pc
+        
+        self.pipeline_regs["EX/MEM"] = {
+            "decoded": decoded,
+            "result": result,
+            "bubble": False
+        }
 
-            #EXECUTE => shold store the curr_pc, decodec, op, rs2, result, next_pc to EX/MEM_regs
-            ex_data = dummy_regs["ID/EX"]
-            if ex_data is not None:
-                result = self.execute(ex_data["op1"], ex_data["op2"], ex_data["op"])
-                next_pc = self.update_pc(ex_data["op"], result, ex_data["curr_pc"], ex_data["decoded"])
-                self.pipeline_regs["EX/MEM"] = {
-                    "curr_pc": ex_data["curr_pc"], "decoded": ex_data["decoded"],
-                    "op": ex_data["op"], "store_data": ex_data["store_data"],
-                    "result": result, "next_pc": next_pc
-                }
-            else:
-                self.pipeline_regs["EX/MEM"] = None
+    def memory_stage(self):
+        """
+        Memory Access (MEM) stage
+        Accesses memory for load/store instructions
+        """
+        ex_mem = self.pipeline_regs["EX/MEM"]
+        
+        if ex_mem is None or ex_mem.get("bubble"):
+            self.pipeline_regs["MEM/WB"] = {"bubble": True}
+            return
+        
+        decoded = ex_mem["decoded"]
+        result = ex_mem["result"]
+        
+        mem_data = self.mem_access(decoded, result)
+        
+        self.pipeline_regs["MEM/WB"] = {
+            "decoded": decoded,
+            "result": result,
+            "mem_data": mem_data,
+            "bubble": False
+        }
 
-
-            #MEMORY ACCESS=> should store the curr_pc, decoded,op, result, next_pc, ldata to MEM/WB_regs
-            mem_data = dummy_regs["EX/MEM"]
-            if mem_data is not None:
-                ldata = self.mem_access(
-                    mem_data["op"], mem_data["result"], 
-                    mem_data["decoded"], mem_data["store_data"] # Use passed store_data
-                )
-                self.pipeline_regs["MEM/WB"] = {
-                    "curr_pc": mem_data["curr_pc"], "decoded": mem_data["decoded"],
-                    "op": mem_data["op"], "result": mem_data["result"],
-                    "next_pc": mem_data["next_pc"], "ldata": ldata
-                }
-            else:
-                self.pipeline_regs["MEM/WB"] = None
-
-            #WRITE BACK 
-            wb_data = dummy_regs["MEM/WB"]
-            if wb_data is not None:
-                self.reg_write(
-                    wb_data["op"], wb_data["decoded"], wb_data["curr_pc"],
-                    wb_data["next_pc"], wb_data["result"], wb_data["ldata"],
-                    self.registers
-                )
-
-
-        pass
-
+    def writeback_stage(self):
+        """
+        Write Back (WB) stage
+        Writes result back to register file
+        Returns True if an instruction completed
+        """
+        mem_wb = self.pipeline_regs["MEM/WB"]
+        
+        if mem_wb is None or mem_wb.get("bubble"):
+            return False
+        
+        decoded = mem_wb["decoded"]
+        result = mem_wb["result"]
+        mem_data = mem_wb.get("mem_data")
+        
+        self.reg_write(decoded, result, mem_data)
+        
+        return True
