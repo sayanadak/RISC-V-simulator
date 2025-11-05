@@ -8,5 +8,9 @@
 *.pyc
 *.log
 *.trace
+<<<<<<< HEAD
 *.out
 *.json
+=======
+*.json
+>>>>>>> lab5
