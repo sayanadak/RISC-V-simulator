@@ -7,8 +7,7 @@ class RAM:
         if address in self.mem:
             return self.mem[address]
         else:
-            # raise ValueError(f"Address {hex(address)} not found in memory.")
-            return 0 ;
+            raise ValueError(f"Address {hex(address)} not found in memory.")
 
     def write(self, address, data):
         self.mem[address] = data

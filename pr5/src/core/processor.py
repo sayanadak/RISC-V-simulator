@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from .fu import *
 from .riscv_tables import *
 
@@ -38,6 +39,7 @@ class Processor:
             rd = (instruction >> 7) & 0x1F
             imm = 0
             
+        
         elif opcode == 0x03:
             imm = instruction >> 20
             if imm & 0x800:  
@@ -49,6 +51,7 @@ class Processor:
             funct7 = 0
             rs2 = 0
             
+        
         elif opcode == 0x13:
             imm = instruction >> 20
             if imm & 0x800:  
@@ -57,12 +60,14 @@ class Processor:
             rs1 = (instruction >> 15) & 0x1F
             funct3 = (instruction >> 12) & 0x07
             rd = (instruction >> 7) & 0x1F
-            if funct3 in [0x1, 0x5]: 
+            
+            if funct3 in [0x1, 0x5]:  
                 funct7 = (instruction >> 25) & 0x7F
             else:
                 funct7 = 0
             rs2 = 0
             
+        
         elif opcode == 0x23:
             imm = ((instruction >> 25) << 5) | ((instruction >> 7) & 0x1F)
             if imm & 0x800:  
@@ -74,6 +79,7 @@ class Processor:
             funct7 = 0
             rd = 0
             
+        
         elif opcode == 0x63:
             imm_12 = (instruction >> 31) & 0x1
             imm_10_5 = (instruction >> 25) & 0x3F
@@ -89,17 +95,20 @@ class Processor:
             funct7 = 0
             rd = 0
             
+        
         elif opcode == 0x37:
             imm = instruction & 0xFFFFF000
             imm = self._to_signed_32(imm)
             rd = (instruction >> 7) & 0x1F
             rs1 = rs2 = funct3 = funct7 = 0
             
+        
         elif opcode == 0x17:
-            imm = instruction & 0xFFFFF000 
+            imm = (instruction & 0xFFFFF000)
             rd = (instruction >> 7) & 0x1F
             rs1 = rs2 = funct3 = funct7 = 0
             
+        
         elif opcode == 0x6F:
             imm_20 = (instruction >> 31) & 0x1
             imm_10_1 = (instruction >> 21) & 0x3FF
@@ -112,6 +121,7 @@ class Processor:
             rd = (instruction >> 7) & 0x1F
             rs1 = rs2 = funct3 = funct7 = 0
             
+        
         elif opcode == 0x67:
             imm = instruction >> 20
             if imm & 0x800:  
@@ -123,6 +133,7 @@ class Processor:
             funct7 = 0
             rs2 = 0
             
+        
         elif opcode == 0x73:
             imm = instruction >> 20
             rs1 = (instruction >> 15) & 0x1F
@@ -149,17 +160,18 @@ class Processor:
         return op, decoded
 
     def _to_signed_32(self, value):
-        """Convert a value to signed 32-bit integer."""
+        
         value = value & 0xFFFFFFFF
         if value & 0x80000000:
             return value - (1 << 32)
         return value
+    
+    def _to_unsigned_32(self, value):
+        """Convert a value to unsigned 32-bit integer."""
+        return value & 0xFFFFFFFF
 
     def operand_fetch(self, decoded, registers, pc):
-        """
-        Fetch operands from registers based on the decoded instruction.
-        Returns: (op1, op2)
-        """
+        
         rs1 = decoded["rs1"]
         rs2 = decoded["rs2"]
         v_rs1 = registers[rs1] if rs1 != 0 else 0
@@ -199,15 +211,16 @@ class Processor:
         next_pc = pc + 4
         
         if is_branch(op) and result:
+            
             next_pc = pc + decoded["imm"]
             self.logr.debug(f"Branch taken to {next_pc:08x}")
         elif is_jump(op):
             opcode = decoded["opcode"]
-            if opcode == 0x6F: 
+            if opcode == 0x6F:  
                 next_pc = pc + decoded["imm"]
                 self.logr.debug(f"JAL to {next_pc:08x}")
             elif opcode == 0x67:  
-                rs1_val = registers[decoded["rs1"]]
+                rs1_val = registers[decoded["rs1"]] if decoded["rs1"] != 0 else 0
                 next_pc = (rs1_val + decoded["imm"]) & ~1
                 self.logr.debug(f"JALR to {next_pc:08x}")
                 
@@ -224,24 +237,27 @@ class Processor:
             masked = (op & 0x00F00) >> 8
             if masked == 0x0:  
                 ldata = mem.read(addr) & 0xFF
+               
                 if ldata & 0x80:
                     ldata = ldata | 0xFFFFFF00
-                ldata = ldata & 0xFFFFFFFF
+                ldata = self._to_signed_32(ldata)
                 self.logr.debug(f"Load byte from {addr:08x} => {ldata:08x}")
             elif masked == 0x4:  
                 ldata = mem.read(addr) & 0xFF
                 self.logr.debug(f"Load byte unsigned from {addr:08x} => {ldata:08x}")
-            elif masked == 0x1: 
+            elif masked == 0x1:  
                 ldata = mem.read_halfword(addr) & 0xFFFF
+               
                 if ldata & 0x8000:
                     ldata = ldata | 0xFFFF0000
-                ldata = ldata & 0xFFFFFFFF
+                ldata = self._to_signed_32(ldata)
                 self.logr.debug(f"Load halfword from {addr:08x} => {ldata:08x}")
             elif masked == 0x5:  
                 ldata = mem.read_halfword(addr) & 0xFFFF
                 self.logr.debug(f"Load halfword unsigned from {addr:08x} => {ldata:08x}")
             elif masked == 0x2:  
-                ldata = mem.read_word(addr) & 0xFFFFFFFF
+                ldata = mem.read_word(addr)
+                ldata = self._to_signed_32(ldata)
                 self.logr.debug(f"Load word from {addr:08x} => {ldata:08x}")
                 
         elif is_store(op):
@@ -271,6 +287,7 @@ class Processor:
             logr.out(f"{pc:08x} | next_pc={next_pc:08x} | x?=00000000 | mem[?]=00000000")
             
         elif is_jump(op):
+            
             return_addr = (pc + 4) & 0xFFFFFFFF
             if rd != 0:
                 registers[rd] = return_addr
@@ -278,8 +295,8 @@ class Processor:
             
         elif is_load(op) and ldata is not None:
             if rd != 0:
-                registers[rd] = ldata & 0xFFFFFFFF
-            logr.out(f"{pc:08x} | next_pc={next_pc:08x} | x{rd}={ldata & 0xFFFFFFFF:08x} | mem[{result:08x}] => {ldata & 0xFFFFFFFF:08x}")
+                registers[rd] = self._to_unsigned_32(ldata)
+            logr.out(f"{pc:08x} | next_pc={next_pc:08x} | x{rd}={self._to_unsigned_32(ldata):08x} | mem[{result:08x}] => {self._to_unsigned_32(ldata):08x}")
             
         elif is_store(op):
             rs2 = decoded["rs2"]
@@ -287,12 +304,17 @@ class Processor:
             logr.out(f"{pc:08x} | next_pc={next_pc:08x} | x?=00000000 | mem[{result:08x}] <= {data & 0xFFFFFFFF:08x}")
             
         else:
+            
             if rd != 0:
-                registers[rd] = result & 0xFFFFFFFF
-            logr.out(f"{pc:08x} | next_pc={next_pc:08x} | x{rd}={result & 0xFFFFFFFF:08x} | mem[?]=00000000")
+                registers[rd] = self._to_unsigned_32(result)
+            logr.out(f"{pc:08x} | next_pc={next_pc:08x} | x{rd}={self._to_unsigned_32(result):08x} | mem[?]=00000000")
+        
+        
+        registers[0] = 0
             
         return registers
 
+    @abstractmethod
     def run(self, num_insts):
         """
         Base run method - can be overridden by subclasses.
