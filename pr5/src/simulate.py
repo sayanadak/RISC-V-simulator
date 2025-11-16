@@ -17,31 +17,6 @@ if not hasattr(stats.Statistics, "__patched__"):
     stats.Statistics.__init__ = patched_init
     stats.Statistics.__patched__ = True
 
-if hasattr(core, "PipelinedProcessor") and hasattr(core.PipelinedProcessor, "mem_access"):
-    _orig_mem_access = core.PipelinedProcessor.mem_access
-    def _tracked_mem_access(self, *args, **kwargs):
-        if hasattr(self, "stats"):
-            try:
-                self.stats.increment_memory_access()
-            except Exception:
-                pass
-        return _orig_mem_access(self, *args, **kwargs)
-    core.PipelinedProcessor.mem_access = _tracked_mem_access
-
-if hasattr(core, "FPipelinedProcessor"):
-    try:
-        _orig_fp_mem_access = core.FPipelinedProcessor.mem_access
-        def _tracked_fp_mem_access(self, *args, **kwargs):
-            if hasattr(self, "stats"):
-                try:
-                    self.stats.increment_memory_access()
-                except Exception:
-                    pass
-            return _orig_fp_mem_access(self, *args, **kwargs)
-        core.FPipelinedProcessor.mem_access = _tracked_fp_mem_access
-    except Exception:
-        pass
-
 def parse_args():
     parser = argparse.ArgumentParser(description="RISC-V Processor Simulator")
     parser.add_argument('--start', type=lambda x: int(x.replace('0x', '').replace('0X', ''), 16), 
@@ -142,4 +117,3 @@ def run_simulation():
 
 if __name__ == "__main__":
     run_simulation()
-

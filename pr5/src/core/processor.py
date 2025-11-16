@@ -234,6 +234,7 @@ class Processor:
         ldata = None
         
         if is_load(op):
+            self.stats.increment_memory_access()
             masked = (op & 0x00F00) >> 8
             if masked == 0x0:  
                 ldata = mem.read(addr) & 0xFF
@@ -261,6 +262,7 @@ class Processor:
                 self.logr.debug(f"Load word from {addr:08x} => {ldata:08x}")
                 
         elif is_store(op):
+            self.stats.increment_memory_access()
             rs2 = decoded["rs2"]
             data = registers[rs2] if rs2 != 0 else 0
             masked = (op & 0x00F00) >> 8
